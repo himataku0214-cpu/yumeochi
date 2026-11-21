@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#07061a"><title>Yumeochi Ver.0.9</title><style>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#07061a"><title>Yumeochi Ver.1.0</title><style>
 *{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07061a;font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;touch-action:none}
 canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
@@ -28,12 +28,27 @@ canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
 @keyframes fadeIn{from{opacity:0}}@keyframes pop{from{transform:scale(.85) translateY(10px);opacity:0}}@keyframes pulse{50%{transform:scale(1.07)}}@keyframes shimmer{to{background-position:-200% 0}}
 @media (max-height:520px){#over .card{padding:16px 18px 14px}#over .sub{display:none}#over .label{margin-top:8px}#over .dist{font-size:52px}#over .stats{margin-top:10px}#retryBtn{margin-top:12px;min-height:50px}}
 @media (prefers-reduced-motion:reduce){#over .newrec{animation:none}}
-</style></head><body><canvas id="game"></canvas><button id="pauseBtn" aria-label="一時停止" disabled>Ⅱ</button><div id="hint">長押しで上昇・離すと落下</div><div id="over" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="card"><h2 id="overTitle">ゲームオーバー！</h2><div class="sub">― 悪夢に呑まれてしまった… ―</div><div class="label">到達距離</div><div class="dist"><span id="overDist">0</span><small>m</small></div><div class="newrec" id="newRec">NEW RECORD!</div><div class="stats"><div class="stat star"><span>夢のかけら</span><b>✦ <span id="overStars">0</span></b></div><div class="stat best"><span>BEST</span><b><span id="overBest">0</span> m</b></div></div><button id="retryBtn" type="button">もう一回！</button></div></div><script>
+</style></head><body><canvas id="game"></canvas><button id="pauseBtn" aria-label="一時停止" disabled>Ⅱ</button><div id="hint">長押しで上昇・離すと落下</div><div id="over" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="card"><h2 id="overTitle">ゲームオーバー！</h2><div class="sub">― 悪夢に呑まれてしまった… ―</div><div class="label">到達距離</div><div class="dist"><span id="overDist">0</span><small>m</small></div><div class="newrec" id="newRec">NEW RECORD!</div><div class="stats"><div class="stat star"><span>今回の夢の星</span><b>✦ <span id="overStars">0</span></b><span>最高 <span id="overBestStars">0</span></span></div><div class="stat best"><span>BEST</span><b><span id="overBest">0</span> m</b></div></div><button id="retryBtn" type="button">もう一回！</button></div></div><script>
 /* ===== ゲームロジック（Ver.0.4 から変更なし） ===== */
 const c=document.querySelector('canvas'),ctx=c.getContext('2d');let W=360,H=640,dpr=1;function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);buildScenery()}addEventListener('resize',resize);
-let state='ready',hold=false,y=0,vy=0,dist=0,obstacles=[],coins=[],coinCount=0,spawn=0,last=0,best=Number(localStorage.getItem('magnetBest')||0);const pauseBtn=document.getElementById('pauseBtn');const radius=15;let previousKind='bottom';
-let bestAtStart=best;const overEl=document.getElementById('over'),retryBtn=document.getElementById('retryBtn');function showGameOver(){const d=Math.floor(dist);document.getElementById('overDist').textContent=d;document.getElementById('overStars').textContent=coinCount;document.getElementById('overBest').textContent=best;document.getElementById('newRec').classList.toggle('show',d>bestAtStart);retryBtn.disabled=true;overEl.classList.add('show');setTimeout(()=>{retryBtn.disabled=false;retryBtn.focus({preventScroll:true})},500)}function hideGameOver(){overEl.classList.remove('show')}overEl.addEventListener('pointerdown',e=>{e.stopPropagation()});retryBtn.addEventListener('click',e=>{e.preventDefault();if(state==='over'&&!retryBtn.disabled){hideGameOver();reset()}});
-function reset(){hideGameOver();bestAtStart=best;state='play';pauseBtn.disabled=false;pauseBtn.textContent='Ⅱ';hold=false;y=H*.52;vy=0;dist=0;coinCount=0;spawn=0;obstacles=[];coins=[];previousKind='bottom';last=performance.now();sparks=[];obstacleAnimationTime=0}
+let state='ready',hold=false,y=0,vy=0,dist=0,obstacles=[],stars=[],starCount=0,spawn=0,last=0,best=Number(localStorage.getItem('magnetBest')||0);const pauseBtn=document.getElementById('pauseBtn');const radius=15;let previousKind='bottom';
+const starRecordKey='yumeochiBestStars',starRadius=9,starSpacing=40;
+let bestStars=0,nextStarDistance=20;
+try{
+ const stored=Number(localStorage.getItem(starRecordKey));
+ if(Number.isSafeInteger(stored)&&stored>0)bestStars=stored;
+}catch{}
+function collectStar(star){
+ star.taken=true;
+ starCount++;
+ burst(star.x,star.y);
+ if(starCount>bestStars){
+  bestStars=starCount;
+  try{localStorage.setItem(starRecordKey,String(bestStars))}catch{}
+ }
+}
+let bestAtStart=best;const overEl=document.getElementById('over'),retryBtn=document.getElementById('retryBtn');function showGameOver(){const d=Math.floor(dist);document.getElementById('overDist').textContent=d;document.getElementById('overStars').textContent=starCount;document.getElementById('overBestStars').textContent=bestStars;document.getElementById('overBest').textContent=best;document.getElementById('newRec').classList.toggle('show',d>bestAtStart);retryBtn.disabled=true;overEl.classList.add('show');setTimeout(()=>{retryBtn.disabled=false;retryBtn.focus({preventScroll:true})},500)}function hideGameOver(){overEl.classList.remove('show')}overEl.addEventListener('pointerdown',e=>{e.stopPropagation()});retryBtn.addEventListener('click',e=>{e.preventDefault();if(state==='over'&&!retryBtn.disabled){hideGameOver();reset()}});
+function reset(){hideGameOver();bestAtStart=best;state='play';pauseBtn.disabled=false;pauseBtn.textContent='Ⅱ';hold=false;y=H*.52;vy=0;dist=0;starCount=0;nextStarDistance=20;spawn=0;obstacles=[];stars=[];previousKind='bottom';last=performance.now();sparks=[];obstacleAnimationTime=0}
 function down(e){e.preventDefault();if(state==='paused')return;if(state!=='play')reset();hold=true}function up(e){if(e)e.preventDefault();hold=false}c.addEventListener('pointerdown',down);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);function pause(){if(state==='play'){state='paused';hold=false;pauseBtn.textContent='▶';pauseBtn.setAttribute('aria-label','再開')}}function resume(){if(state==='paused'){state='play';hold=false;last=performance.now();pauseBtn.textContent='Ⅱ';pauseBtn.setAttribute('aria-label','一時停止')}}pauseBtn.addEventListener('pointerdown',e=>e.stopPropagation());pauseBtn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();state==='paused'?resume():pause()});document.addEventListener('visibilitychange',()=>{hold=false;if(document.hidden)pause();last=performance.now()});window.addEventListener('blur',()=>{hold=false;pause()});document.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('selectstart',e=>e.preventDefault());
 
 /* ===== 夢の世界の描画 ===== */
@@ -341,21 +356,60 @@ function drawObstacle(o,oy,time){
  }
  ctx.restore();
 }
-function drawShard(cn,now){const p=.75+Math.sin(now*4+cn.x*.05)*.25;ctx.globalAlpha=.55*p+.25;ctx.drawImage(glowC,cn.x-24,cn.y-24,48,48);ctx.globalAlpha=1;ctx.save();ctx.translate(cn.x,cn.y);ctx.scale(.65+Math.abs(Math.cos(now*2.2+cn.x*.02))*.35,1);const sg=ctx.createLinearGradient(0,-12,0,12);sg.addColorStop(0,'#f4fdff');sg.addColorStop(1,'#6cc4f5');ctx.fillStyle=sg;ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(8,-2);ctx.lineTo(0,12);ctx.lineTo(-8,-2);ctx.closePath();ctx.fill();ctx.strokeStyle='#ffffffcc';ctx.lineWidth=1.2;ctx.stroke();ctx.strokeStyle='#3b8fc9aa';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-8,-2);ctx.lineTo(8,-2);ctx.moveTo(0,-12);ctx.lineTo(0,12);ctx.stroke();ctx.restore()}
+function makeStarSprite(){
+ const image=mk(40,40),g=image.getContext('2d');
+ const halo=g.createRadialGradient(20,20,0,20,20,20);
+ halo.addColorStop(0,'#c4e8ff91');
+ halo.addColorStop(.48,'#b9a3ff52');
+ halo.addColorStop(1,'#b9a3ff00');
+ g.fillStyle=halo;
+ g.fillRect(0,0,40,40);
+ const core=g.createLinearGradient(0,11,0,29);
+ core.addColorStop(0,'#e6f7ff');
+ core.addColorStop(.5,'#bfe7ff');
+ core.addColorStop(1,'#cbb2ff');
+ g.fillStyle=core;
+ g.beginPath();
+ for(let i=0;i<8;i++){
+  const angle=i*Math.PI/4-Math.PI/2;
+  const reach=i%2?3:starRadius;
+  const x=20+Math.cos(angle)*reach,y=20+Math.sin(angle)*reach;
+  if(i===0)g.moveTo(x,y);else g.lineTo(x,y);
+ }
+ g.closePath();g.fill();
+ return image;
+}
+const starSprite=makeStarSprite();
+function drawStar(star,time){
+ ctx.globalAlpha=.73+Math.sin(time*2.2+star.phase)*.23;
+ ctx.drawImage(starSprite,star.x-20,star.y-20);
+ ctx.globalAlpha=1;
+}
+function spawnStar(ox,ow,kind,h,top,bottom){
+ const x=ox+ow+48;
+ const gapTop=top+12+(kind==='top'?h:0);
+ const gapBottom=bottom-(kind==='bottom'?h:0);
+ if(gapBottom-gapTop<2*(radius+starRadius))return;
+ const y=(gapTop+gapBottom)*.5;
+ const clear=obstacles.every(o=>{
+  const oy=o.kind==='top'?top:bottom-o.h;
+  return x+20<=o.x||x-20>=o.x+o.w||y+20<=oy||y-20>=oy+o.h;
+ });
+ if(!clear)return;
+ stars.push({x,y,taken:false,phase:dist*.37});
+ nextStarDistance=dist+starSpacing;
+}
 
 resize();
 function loop(t){let dt=Math.min((t-last)/1000||0,.034);last=t;let playerX=W*.3,top=H*.14,bottom=H*.84,speed=230*(dist<50?1:dist<100?1.05:dist<200?1.12:dist<300?1.20:1.30);if(state==='play'){vy+=(hold?-1350:1100)*dt;vy=Math.max(-350,Math.min(400,vy));y+=vy*dt;dist+=speed*dt/10;spawn-=speed*dt;if(spawn<=0){let kind=dist<50?'bottom':(dist<100?(Math.random()<.5?'top':'bottom'):(Math.random()<.58?(previousKind==='top'?'bottom':'top'):previousKind));previousKind=kind;let heightRatio=dist<50?.19:dist<100?.22:dist<200?.25:dist<300?.28:.30;let h=(bottom-top)*heightRatio;const ox=W+40,ow=dist<200?42:48;
 obstacles.push({x:ox,w:ow,kind,h,stage:stageIndex(dist)});
-if(dist>=20&&Math.random()<.75){
-  const cy=kind==='top'?Math.min(bottom-45,top+h+65):Math.max(top+45,bottom-h-65);
-  coins.push({x:ox+ow+48,y:cy,taken:false});
-}
+if(dist>=20&&Math.random()<.75&&dist>=nextStarDistance)spawnStar(ox,ow,kind,h,top,bottom);
 spawn=(dist<50?270:dist<100?255:dist<200?235:dist<300?225:215)+Math.random()*65}for(let o of obstacles){o.x-=speed*dt;let oy=o.kind==='top'?top:bottom-o.h;if(playerX+radius>o.x&&playerX-radius<o.x+o.w&&y+radius>oy&&y-radius<oy+o.h)state='over'}obstacles=obstacles.filter(o=>o.x+o.w>0);
-for(const coin of coins){
-  coin.x-=speed*dt;
-  if(!coin.taken&&Math.hypot(coin.x-playerX,coin.y-y)<radius+12){coin.taken=true;coinCount++;burst(coin.x,coin.y)}
+for(const star of stars){
+  star.x-=speed*dt;
+  if(Math.hypot(star.x-playerX,star.y-y)<=radius+starRadius)collectStar(star);
 }
-coins=coins.filter(coin=>!coin.taken&&coin.x>-20);if(y-radius<top+12||y+radius>bottom)state='over';if(state==='over'){pauseBtn.disabled=true}if(state==='over'&&dist>best){best=Math.floor(dist);localStorage.setItem('magnetBest',best)}if(state==='over')showGameOver()}
+stars=stars.filter(star=>!star.taken&&star.x>-20);if(y-radius<top+12||y+radius>bottom)state='over';if(state==='over'){pauseBtn.disabled=true}if(state==='over'&&dist>best){best=Math.floor(dist);localStorage.setItem('magnetBest',best)}if(state==='over')showGameOver()}
  /* --- 描画 --- */
  if(state==='play')obstacleAnimationTime+=dt;
  if(state==='ready'||state==='play')backgroundTime+=dt;
@@ -396,12 +450,12 @@ coins=coins.filter(coin=>!coin.taken&&coin.x>-20);if(y-radius<top+12||y+radius>b
  let mx=playerX;ctx.lineWidth=11;ctx.strokeStyle='#5c5579';ctx.beginPath();ctx.moveTo(mx-19,top);ctx.lineTo(mx-19,top+27);ctx.arc(mx,top+27,19,Math.PI,0,true);ctx.lineTo(mx+19,top);ctx.stroke();ctx.lineWidth=2;ctx.strokeStyle='#8b84ad';ctx.beginPath();ctx.arc(mx,top+27,19,Math.PI,0,true);ctx.stroke();rect(mx-24.5,top,11,15,'#9fe6ff');rect(mx+14,top,11,15,'#9fe6ff');ctx.globalAlpha=hold&&state==='play'?.9:.35;ctx.drawImage(glowC,mx-30,top+30,60,40);ctx.globalAlpha=1;
  if(hold&&state==='play'){const bm=ctx.createLinearGradient(0,top+49,0,y);bm.addColorStop(0,'#a8e6ff40');bm.addColorStop(1,'#a8e6ff08');ctx.fillStyle=bm;ctx.beginPath();ctx.moveTo(mx-22,top+49);ctx.lineTo(mx+22,top+49);ctx.lineTo(mx+45,y);ctx.lineTo(mx-45,y);ctx.fill()}
  for(let o of obstacles){let oy=o.kind==='top'?top:bottom-o.h;drawObstacle(o,oy,obstacleAnimationTime)}
- for(const coin of coins)drawShard(coin,now);
+ for(const star of stars)drawStar(star,obstacleAnimationTime);
  if(state!=='paused'){for(const s of sparks){s.x+=s.vx*dt;s.y+=s.vy*dt;s.vx*=.94;s.vy*=.94;s.life-=dt}sparks=sparks.filter(s=>s.life>0)}
  for(const s of sparks){const a=Math.min(1,s.life*2.2);ctx.globalAlpha=a;ctx.drawImage(glowW,s.x-7,s.y-7,14,14);ctx.fillStyle='#ffffff';ctx.fillRect(s.x-1,s.y-1,2,2)}ctx.globalAlpha=1;
  drawSpirit(playerX,state==='ready'?H*.52:y,now);
  // HUD
- txt('Yumeochi',16,37,22,'#ece3ff','left',SERIF);txt(`${Math.floor(dist)} m   ✦ ${coinCount}`,16,65,18,'#c4f3ff');txt(`BEST ${best} m`,W-16,36,14,'#e4ccff','right');txt(`LEVEL ${stage+1}・${stages[stage].name}`,W-16,59,12,'#b6c6f0','right');
+ txt('Yumeochi',16,37,22,'#ece3ff','left',SERIF);txt(`${Math.floor(dist)} m   ✦ ${starCount} / 最高 ${bestStars}`,16,65,14,'#c4f3ff');txt(`BEST ${best} m`,W-16,36,14,'#e4ccff','right');txt(`LEVEL ${stage+1}・${stages[stage].name}`,W-16,59,12,'#b6c6f0','right');
  if(state==='over'){rect(0,0,W,H,'#05031080')}else if(state!=='play'){rect(0,0,W,H,'#05031099');txt(state==='paused'?'一時停止中':'長押しで浮こう！',W/2,H*.42,27,'#ece3ff','center',SERIF);txt(state==='paused'?'右上の ▶ で再開':'障害物をよけて進もう',W/2,H*.49,16,'#c9d8ff','center');if(state==='ready')txt('― 悪夢の世界へようこそ ―',W/2,H*.36,13,'#a99bd6','center',SERIF);if(state!=='paused')txt('画面を押してスタート',W/2,H*.59,19,'#9fe6ff','center')}
  requestAnimationFrame(loop)}requestAnimationFrame(loop);
 </script></body></html>
