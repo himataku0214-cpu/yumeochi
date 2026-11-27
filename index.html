@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#07061a"><title>Yumeochi Ver.1.1</title><style>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#07061a"><title>Yumeochi Ver.1.2</title><style>
 *{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07061a;font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;touch-action:none}
 canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
@@ -39,7 +39,9 @@ canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
 #characterMenu .character canvas{width:54px;height:54px;touch-action:pan-y}
 #characterMenu small{display:block;color:#ded2ff}
 #characterMenu button:disabled{opacity:.58;cursor:default}
-#characterClose{width:100%}
+#characterClose,#characterStart{width:100%}
+#characterStart{margin-bottom:8px}
+#overCharacterOpen{width:100%;min-height:44px;margin-top:8px;padding:6px 12px;border:1px solid #b9a8ff88;border-radius:12px;background:#302454;color:#f2eaff;font:inherit;font-weight:bold;touch-action:manipulation;cursor:pointer}
 </style></head><body><canvas id="game"></canvas>
 <button id="characterOpen" type="button" aria-haspopup="dialog">キャラ選択</button>
 <dialog id="characterMenu" aria-labelledby="characterTitle">
@@ -48,8 +50,9 @@ canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
  <div class="character"><canvas id="preview-spirit" width="108" height="108" aria-hidden="true"></canvas><div><strong>初期キャラ</strong><small id="status-spirit"></small></div><button id="use-spirit" type="button"></button></div>
  <div class="character"><canvas id="preview-cat" width="108" height="108" aria-hidden="true"></canvas><div><strong>夢ネコ</strong><small id="status-cat"></small></div><button id="use-cat" type="button"></button></div>
  <div class="character"><canvas id="preview-moon" width="108" height="108" aria-hidden="true"></canvas><div><strong>月の子</strong><small id="status-moon"></small></div><button id="use-moon" type="button"></button></div>
+ <button id="characterStart" type="button" hidden>このキャラでスタート</button>
  <button id="characterClose" type="button">スタート画面に戻る</button>
-</dialog><button id="pauseBtn" aria-label="一時停止" disabled>Ⅱ</button><div id="hint">長押しで上昇・離すと落下</div><div id="over" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="card"><h2 id="overTitle">ゲームオーバー！</h2><div class="sub">― 悪夢に呑まれてしまった… ―</div><div class="label">到達距離</div><div class="dist"><span id="overDist">0</span><small>m</small></div><div class="newrec" id="newRec">NEW RECORD!</div><div class="stats"><div class="stat star"><span>今回の夢の星</span><b>✦ <span id="overStars">0</span></b><span>最高 <span id="overBestStars">0</span></span><small id="overStarWallet"></small></div><div class="stat best"><span>BEST</span><b><span id="overBest">0</span> m</b></div></div><button id="retryBtn" type="button">もう一回！</button></div></div><script>
+</dialog><button id="pauseBtn" aria-label="一時停止" disabled>Ⅱ</button><div id="hint">長押しで上昇・離すと落下</div><div id="over" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="card"><h2 id="overTitle">ゲームオーバー！</h2><div class="sub">― 悪夢に呑まれてしまった… ―</div><div class="label">到達距離</div><div class="dist"><span id="overDist">0</span><small>m</small></div><div class="newrec" id="newRec">NEW RECORD!</div><div class="stats"><div class="stat star"><span>今回の夢の星</span><b>✦ <span id="overStars">0</span></b><span>最高 <span id="overBestStars">0</span></span><small id="overStarWallet"></small></div><div class="stat best"><span>BEST</span><b><span id="overBest">0</span> m</b></div></div><button id="retryBtn" type="button">もう一回！</button><button id="overCharacterOpen" type="button" aria-haspopup="dialog">キャラ選択</button></div></div><script>
 /* ===== ゲームロジック（Ver.0.4 から変更なし） ===== */
 const c=document.querySelector('canvas'),ctx=c.getContext('2d');let W=360,H=640,dpr=1;function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);buildScenery()}addEventListener('resize',resize);
 let state='ready',hold=false,y=0,vy=0,dist=0,obstacles=[],stars=[],starCount=0,spawn=0,last=0,best=readRecord('magnetBest');const pauseBtn=document.getElementById('pauseBtn');const radius=15;let previousKind='bottom';
@@ -111,8 +114,9 @@ function collectStar(star){
   saveRecord(starRecordKey,String(bestStars));
  }
 }
-let bestAtStart=best;const overEl=document.getElementById('over'),retryBtn=document.getElementById('retryBtn');function showGameOver(){const d=Math.floor(dist);document.getElementById('overDist').textContent=d;document.getElementById('overStars').textContent=starCount;document.getElementById('overBestStars').textContent=bestStars;document.getElementById('overStarWallet').textContent=`所持 ✦ ${profile.balance}`;document.getElementById('overBest').textContent=best;document.getElementById('newRec').classList.toggle('show',d>bestAtStart);retryBtn.disabled=true;overEl.classList.add('show');setTimeout(()=>{retryBtn.disabled=false;retryBtn.focus({preventScroll:true})},500)}function hideGameOver(){overEl.classList.remove('show')}overEl.addEventListener('pointerdown',e=>{e.stopPropagation()});retryBtn.addEventListener('click',e=>{e.preventDefault();if(state==='over'&&!retryBtn.disabled){hideGameOver();reset()}});
-function reset(){hideGameOver();bestAtStart=best;state='play';characterOpen.hidden=true;pauseBtn.disabled=false;pauseBtn.textContent='Ⅱ';hold=false;y=H*.52;vy=0;dist=0;starCount=0;nextStarDistance=20;spawn=0;obstacles=[];stars=[];previousKind='bottom';last=performance.now();sparks=[];obstacleAnimationTime=0}
+let bestAtStart=best;const overEl=document.getElementById('over'),retryBtn=document.getElementById('retryBtn');function showGameOver(){const d=Math.floor(dist);document.getElementById('overDist').textContent=d;document.getElementById('overStars').textContent=starCount;document.getElementById('overBestStars').textContent=bestStars;document.getElementById('overStarWallet').textContent=`所持 ✦ ${profile.balance}`;document.getElementById('overBest').textContent=best;document.getElementById('newRec').classList.toggle('show',d>bestAtStart);retryBtn.disabled=true;overEl.classList.add('show');setTimeout(()=>{retryBtn.disabled=false;if(state==='over')retryBtn.focus({preventScroll:true})},500)}function hideGameOver(){overEl.classList.remove('show')}overEl.addEventListener('pointerdown',e=>{e.stopPropagation()});retryBtn.addEventListener('click',e=>{e.preventDefault();if(state==='over'&&!retryBtn.disabled){hideGameOver();reset()}});
+function clearRun(){hold=false;y=H*.52;vy=0;dist=0;starCount=0;nextStarDistance=20;spawn=0;obstacles=[];stars=[];previousKind='bottom';last=performance.now();sparks=[];obstacleAnimationTime=0;clearCharacterTrail()}
+function reset(){hideGameOver();bestAtStart=best;state='play';characterOpen.hidden=true;pauseBtn.disabled=false;pauseBtn.textContent='Ⅱ';clearRun()}
 function down(e){e.preventDefault();if(state==='paused'||state==='select')return;if(state!=='play')reset();hold=true}function up(e){if(e)e.preventDefault();hold=false}c.addEventListener('pointerdown',down);window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);function pause(){if(state==='play'){state='paused';hold=false;pauseBtn.textContent='▶';pauseBtn.setAttribute('aria-label','再開')}}function resume(){if(state==='paused'){state='play';hold=false;last=performance.now();pauseBtn.textContent='Ⅱ';pauseBtn.setAttribute('aria-label','一時停止')}}pauseBtn.addEventListener('pointerdown',e=>e.stopPropagation());pauseBtn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();state==='paused'?resume():pause()});document.addEventListener('visibilitychange',()=>{hold=false;if(document.hidden)pause();last=performance.now()});window.addEventListener('blur',()=>{hold=false;pause()});document.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('selectstart',e=>e.preventDefault());
 
 /* ===== 夢の世界の描画 ===== */
@@ -464,6 +468,77 @@ function spawnStar(ox,ow,kind,h,top,bottom){
  nextStarDistance=dist+starSpacing;
 }
 
+const trailLimit=12;
+const trailMarks=[];
+let trailDelay=0,trailSequence=0;
+
+function makeTrailSprite(shape){
+ const image=mk(16,16),g=image.getContext('2d');
+ if(shape==='paw'){
+  g.fillStyle='#bce8f8';
+  g.beginPath();g.ellipse(8,10,3.5,2.5,-.25,0,Math.PI*2);g.fill();
+  for(let i=0;i<4;i++){
+   const x=3.5+i*3;
+   g.beginPath();g.ellipse(x,i===0||i===3?6.6:4.9,1.05,1.5,0,0,Math.PI*2);g.fill();
+  }
+ }else if(shape==='crescent'){
+  g.fillStyle='#e4caff';
+  g.beginPath();g.moveTo(10,2);
+  g.quadraticCurveTo(1,2,2.5,9);
+  g.quadraticCurveTo(4,16,12,11);
+  g.quadraticCurveTo(5,12,6,6);
+  g.quadraticCurveTo(7,3,10,2);
+  g.fill();
+ }else{
+  const glow=g.createRadialGradient(8,8,0,8,8,8);
+  glow.addColorStop(0,'#eed8ff');
+  glow.addColorStop(.32,'#c49affa8');
+  glow.addColorStop(1,'#a977ff00');
+  g.fillStyle=glow;g.fillRect(0,0,16,16);
+ }
+ return image;
+}
+const trailSprites={
+ paw:makeTrailSprite('paw'),
+ crescent:makeTrailSprite('crescent'),
+ mote:makeTrailSprite('mote')
+};
+
+function clearCharacterTrail(){
+ trailMarks.length=0;
+ trailDelay=0;
+ trailSequence=0;
+}
+function updateCharacterTrail(id,x,y,scroll,dt){
+ if(id==='spirit')return;
+ for(let i=trailMarks.length-1;i>=0;i--){
+  const mark=trailMarks[i];
+  mark.age+=dt;
+  if(mark.age>=mark.life)trailMarks.splice(i,1);
+ }
+ trailDelay-=dt;
+ if(trailDelay>0||dt<=0)return;
+ const paw=id==='cat';
+ const shape=paw?'paw':trailSequence%5===4?'crescent':'mote';
+ const offset=paw?(trailSequence%2?2:-2):Math.sin(trailSequence*2.4)*4;
+ if(trailMarks.length===trailLimit)trailMarks.shift();
+ trailMarks.push({shape,x:x-13+scroll,y:y+offset,age:0,life:paw?.64:1.05});
+ trailSequence++;
+ trailDelay=paw?.11:.085;
+}
+function drawCharacterTrail(scroll){
+ for(const mark of trailMarks){
+  const remaining=1-mark.age/mark.life;
+  const paw=mark.shape==='paw';
+  const size=paw?13:mark.shape==='crescent'?12:8;
+  const lift=mark.age*(paw?6:13);
+  const drift=paw?0:Math.sin(mark.age*4)*3;
+  ctx.globalAlpha=(paw?.50:.65)*remaining;
+  ctx.drawImage(trailSprites[mark.shape],mark.x-scroll+drift-size/2,mark.y-lift-size/2,size,size);
+ }
+ if(trailMarks.length)ctx.globalAlpha=1;
+}
+
 function drawAlternateCharacter(g,id,x,y,time,rising){
  const bob=Math.sin(time*(rising?9:4))*(rising?1.4:.8);
  g.save();
@@ -531,18 +606,43 @@ function paintCharacterPreviews(){
 for(const id of Object.keys(characters)){
  document.getElementById('use-'+id).addEventListener('click',()=>chooseCharacter(id));
 }
-characterOpen.addEventListener('click',()=>{
- if(state!=='ready')return;
+const overCharacterOpen=document.getElementById('overCharacterOpen');
+const characterStart=document.getElementById('characterStart');
+let returnFromCharacterMenu='ready';
+function openCharacterMenu(from){
+ if(state!==from)return;
+ returnFromCharacterMenu=from;
+ const fromGameOver=from==='over';
+ if(fromGameOver){
+  hideGameOver();
+  clearRun();
+ }
  state='select';
+ characterStart.hidden=!fromGameOver;
+ characterClose.textContent=fromGameOver?'結果画面に戻る':'スタート画面に戻る';
  renderCharacterMenu();
  paintCharacterPreviews();
+ characterMenu.returnValue='';
  characterMenu.showModal();
- characterClose.focus();
+ (fromGameOver?characterStart:characterClose).focus();
+}
+characterOpen.addEventListener('click',()=>openCharacterMenu('ready'));
+overCharacterOpen.addEventListener('click',()=>openCharacterMenu('over'));
+characterStart.addEventListener('click',()=>{
+ if(state==='select'&&returnFromCharacterMenu==='over')characterMenu.close('start');
 });
 characterClose.addEventListener('click',()=>characterMenu.close());
 characterMenu.addEventListener('close',()=>{
- state='ready';
- characterOpen.focus();
+ if(returnFromCharacterMenu==='over'&&characterMenu.returnValue==='start'){
+  reset();
+  return;
+ }
+ state=returnFromCharacterMenu;
+ if(state==='over'){
+  document.getElementById('overStarWallet').textContent=`所持 ✦ ${profile.balance}`;
+  overEl.classList.add('show');
+  overCharacterOpen.focus();
+ }else characterOpen.focus();
 });
 
 resize();
@@ -599,6 +699,9 @@ stars=stars.filter(star=>!star.taken&&star.x>-20);if(y-radius<top+12||y+radius>b
  if(state!=='paused'){for(const s of sparks){s.x+=s.vx*dt;s.y+=s.vy*dt;s.vx*=.94;s.vy*=.94;s.life-=dt}sparks=sparks.filter(s=>s.life>0)}
  for(const s of sparks){const a=Math.min(1,s.life*2.2);ctx.globalAlpha=a;ctx.drawImage(glowW,s.x-7,s.y-7,14,14);ctx.fillStyle='#ffffff';ctx.fillRect(s.x-1,s.y-1,2,2)}ctx.globalAlpha=1;
  const playerY=state==='ready'||state==='select'?H*.52:y;
+ if(state==='play')updateCharacterTrail(profile.selected,playerX,playerY,scroll,dt);
+ else if(state==='over'&&trailMarks.length)clearCharacterTrail();
+ if(state==='play'||state==='paused')drawCharacterTrail(scroll);
  if(profile.selected==='spirit')drawSpirit(playerX,playerY,now);
  else drawAlternateCharacter(ctx,profile.selected,playerX,playerY,state==='ready'?now:obstacleAnimationTime,hold&&state==='play');
  // HUD
